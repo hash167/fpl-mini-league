@@ -1,0 +1,12 @@
+version: "3.7"
+services:
+  fml:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes: 
+      - .:/app/
+    environment:
+      - GUNICORN_CONFIG=local
+    ports:
+      - 8000:8000

@@ -2,7 +2,7 @@ import requests
 from dataclasses import dataclass
 from typing import List
 
-from urls import API_URLS
+from src.urls import API_URLS
 
 
 class UrlNotFoundException(Exception):

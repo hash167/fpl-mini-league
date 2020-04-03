@@ -1,2 +1,5 @@
 requests
 dataclasses
+flask
+flask_cors
+gunicorn
