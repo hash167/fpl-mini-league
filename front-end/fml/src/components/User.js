@@ -7,6 +7,7 @@ const User = () => {
 
     const onSubmit = async (e) => {
         e.preventDefault();
+        // const https = require('https')
         const apiURL = `http://localhost:8000/user/${teamId}`;
         fetch(apiURL).then(function(response) {
             return response.json();

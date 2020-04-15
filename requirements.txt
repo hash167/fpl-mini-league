@@ -3,3 +3,4 @@ dataclasses
 flask
 flask_cors
 gunicorn
+pytest

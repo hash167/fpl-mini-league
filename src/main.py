@@ -1,16 +1,19 @@
+import os
 import requests
 from dataclasses import dataclass
 from typing import List
 
 from src.urls import API_URLS
 
+session = requests.session()
+
 
 class UrlNotFoundException(Exception):
     pass
 
 
-def fetch(url):
-    response = requests.get(url=url)
+def fetch(url, headers=None):
+    response = session.get(url=url, headers=headers)
     if response.status_code > 400:
         msg = f'Unable to to fetch {url}.' \
               f'Response Code is {response.status_code}'
@@ -52,10 +55,43 @@ class GameWeek:
         return None
 
 
-@dataclass
+@dataclass(init=False)
 class UserMiniLeague:
-    league_players: List
+    league_id: str
+    page: str
+    league_users: List
     league_standings: List
+
+    def __init__(self, league_id, page):
+        self.league_id = league_id
+        self.page = page
+        print(page)
+        ls = self._get_fpl_league_data()
+        self.league_standings = ls
+        self.league_users = [{
+            team['id']: {
+                'entry': team['entry'],
+                'name': team['entry_name'],
+            }} for team in ls['standings']['results']]
+
+    def _get_fpl_league_data(self):
+        """
+        Use our league id to get history data from the FPL API.
+        """
+        url = "https://users.premierleague.com/accounts/login/"
+
+        headers = {
+            "login": os.environ.get('FPL_LOGIN'),
+            "password": os.environ.get('FPL_PASSWORD'),
+            "app": "plfpl-web",
+            "redirect_uri": "https://fantasy.premierleague.com/a/login",
+        }
+        session.post(url, data=headers)
+        print('login succeeded')
+        self.league_standings = fetch(API_URLS['league_classic'].format(
+            self.league_id,
+            self.page))
+        return self.league_standings
 
 
 @dataclass(init=False)
@@ -72,11 +108,13 @@ class User:
 
         if game_week:
             self.game_week = game_week
-            team_info = fetch(API_URLS['user_picks']
-                              .format(
-                                  self.team_id,
-                                  game_week.current_game_week))
-            self.picks = team_info
+            user_picks = fetch(
+                API_URLS['user_picks'].format(
+                    self.team_id,
+                    game_week.current_game_week))
+            self.user_team_info = fetch(
+                API_URLS['team_info'].format(self.team_id))
+            self.picks = user_picks
             self.first_xi = [pick['element'] for pick in self.picks['picks']
                              if pick['position'] <= 11]
             self.subs = [pick['element'] for pick in self.picks['picks']
@@ -115,9 +153,14 @@ class User:
                     [game['fixture'] in self.fixtures_started
                      for game in player['explain']])
                 first_xi_detail[id]['live_score'] = live_score
-                first_xi_detail[id]['did_not_play'] = no_minutes and game_started
+                did_not_play = no_minutes and game_started
+                first_xi_detail[id]['did_not_play'] = did_not_play
 
         return first_xi_detail
+
+    @property
+    def leagues(self):
+        return self.user_team_info['leagues']['classic']
 
     @property
     def live_score(self):
@@ -143,10 +186,14 @@ class User:
                     valid_formation = self._valid_formation(
                         map(lambda x: self.first_xi_detail[x], self.first_xi))
                 self.subs.pop(i)
-        first_xi_live_scores = [player['live_score'] for player in list(self.first_xi_detail.values())]
+
+        first_xi_live_scores = []
+        for player in list(self.first_xi_detail.values()):
+            first_xi_live_scores.append(player['live_score'])
 
         captain = next(pick["element"] for pick in picks if pick["is_captain"])
-        print(f'Captain is {captain} - {self.first_xi_detail[captain]["web_name"]}')
+        print(f'Captain: {captain}, '
+              f'{self.first_xi_detail[captain]["web_name"]}')
         try:
             vice_captain = next(
                 pick["element"] for pick in picks
@@ -165,7 +212,4 @@ class User:
 
 if __name__ == "__main__":
     gw = GameWeek()
-    print(gw.current_game_week)
-    user = User(team_id='2753605', game_week=gw)
-    # print(user.picks_for_current_gameweek)
-    print(user.live_score)
+    print(gw)

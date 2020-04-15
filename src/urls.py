@@ -7,7 +7,7 @@ API_URLS = {
     'gameweek_live': '{}event/{{}}/live'.format(API_BASE_URL),
     'h2h': '{}leagues-entries-and-h2h-matches/league/{{}}?page={{}}'.format(
         API_BASE_URL),
-    'league_classic': '{}leagues-classic/{{}}/standings/'.format(API_BASE_URL),
+    'league_classic': '{}leagues-classic/{{}}/standings/?page_new_entries=1&page_standings={{}}&phase=1'.format(API_BASE_URL),
     'league_h2h': '{}leagues-h2h/{{}}/standings/'.format(API_BASE_URL),
     'players': '{}elements/'.format(API_BASE_URL),
     'player': '{}element-summary/{{}}/'.format(API_BASE_URL),
