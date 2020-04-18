@@ -32,7 +32,7 @@ class GameWeek:
     static_info: List
     fixtures: List
 
-    def _get_live_elements(self):
+    def get_live_elements(self):
         return fetch(
             API_URLS["gameweek_live"].format(self.current_game_week))
 
@@ -43,7 +43,6 @@ class GameWeek:
     def __init__(self):
         info = fetch(API_URLS['static'])
         self.static_info = info
-        self.live_info = self._get_live_elements()
         self.fixtures = self._get_live_fixtures()
 
     @property
@@ -97,11 +96,13 @@ class UserMiniLeague:
 @dataclass(init=False)
 class User:
     team_id: str
-    picks_for_current_gameweek: List
+    picks: List
     first_xi: List
     subs: List
     fixtures_started: List
     game_week: GameWeek
+    current_player_info: List
+    events: List
 
     def __init__(self, team_id, game_week):
         self.team_id = team_id
@@ -122,6 +123,7 @@ class User:
             self.fixtures_started = [fixture['id']
                                      for fixture in self.game_week.fixtures
                                      if fixture['started']]
+            self.current_player_info = self.get_first_xi_live_detail()
 
     def _valid_formation(players):
         positions = list(map(lambda x: x['element_type'], players))
@@ -137,13 +139,12 @@ class User:
             sum([g, d, m, f]) == 11
         ])
 
-    @property
-    def first_xi_detail(self):
+    def get_first_xi_live_detail(self):
         all_players = self.game_week.static_info['elements']
-        first_xi_detail = {player['id']: player
-                           for player in all_players
-                           if player['id'] in self.first_xi}
-        players = self.game_week.live_info['elements']
+        first_xi_live_detail = {player['id']: player
+                                for player in all_players
+                                if player['id'] in self.first_xi}
+        players = self.game_week.get_live_elements()['elements']
         for player in players:
             if player['id'] in self.first_xi:
                 id = player['id']
@@ -152,22 +153,35 @@ class User:
                 game_started = any(
                     [game['fixture'] in self.fixtures_started
                      for game in player['explain']])
-                first_xi_detail[id]['live_score'] = live_score
+                first_xi_live_detail[id]['live_score'] = live_score
                 did_not_play = no_minutes and game_started
-                first_xi_detail[id]['did_not_play'] = did_not_play
+                first_xi_live_detail[id]['did_not_play'] = did_not_play
 
-        return first_xi_detail
+        return first_xi_live_detail
 
     @property
     def leagues(self):
         return self.user_team_info['leagues']['classic']
+
+    def add_events(self, live_info: List, prev_info: List):
+        events = []
+        for d1, d2 in zip(live_info, prev_info):
+            for key, value in d1.items():
+                if value != d2[key]:
+                    events.append((key, value['live_score'] - d2[key]['live_score']))
+        self.events.extend(events)
+        return events
 
     @property
     def live_score(self):
         picks = self.picks
         active_chip = picks['active_chip']
         picks = picks['picks']
-        subs_out = [player['id'] for player in self.first_xi_detail.values()
+        first_xi_live_detail = self.get_first_xi_live_detail()
+        self.add_events(first_xi_live_detail, self.current_player_info)
+        self.current_player_info = first_xi_live_detail
+        subs_out = [player['id']
+                    for player in first_xi_live_detail.values()
                     if player['did_not_play']]
 
         if active_chip == 'bboost':
@@ -178,31 +192,31 @@ class User:
                 self.first_xi.remove(sub_out)
                 self.first_xi.add(self.subs[0])
                 valid_formation = self._valid_formation(
-                    map(lambda x: self.first_xi_detail[x], self.first_xi))
+                    map(lambda x: first_xi_live_detail[x], self.first_xi))
                 while not valid_formation and i <= 3:
                     i += 1
                     self.first_xi.remove(self.subs[i - 1])
                     self.first_xi.add(self.subs[i])
                     valid_formation = self._valid_formation(
-                        map(lambda x: self.first_xi_detail[x], self.first_xi))
+                        map(lambda x: first_xi_live_detail[x], self.first_xi))
                 self.subs.pop(i)
 
         first_xi_live_scores = []
-        for player in list(self.first_xi_detail.values()):
+        for player in list(first_xi_live_detail.values()):
             first_xi_live_scores.append(player['live_score'])
 
         captain = next(pick["element"] for pick in picks if pick["is_captain"])
         print(f'Captain: {captain}, '
-              f'{self.first_xi_detail[captain]["web_name"]}')
+              f'{first_xi_live_detail[captain]["web_name"]}')
         try:
             vice_captain = next(
                 pick["element"] for pick in picks
                 if pick["is_vice_captain"] and pick["multiplier"] == 1)
         except StopIteration:
             vice_captain = None
-        captain_points = self.first_xi_detail[captain]['live_score']
+        captain_points = self.first_xi_live_detail[captain]['live_score']
         if captain in subs_out and vice_captain:
-            captain_points = self.first_xi_detail[vice_captain]['live_score']
+            captain_points = self.first_xi_live_detail[vice_captain]['live_score']
 
         if active_chip == "3xc":
             captain_points *= 2
