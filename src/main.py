@@ -1,7 +1,7 @@
 import os
 import requests
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 
 from src.urls import API_URLS
 
@@ -124,6 +124,7 @@ class User:
                                      for fixture in self.game_week.fixtures
                                      if fixture['started']]
             self.current_player_info = self.get_first_xi_live_detail()
+            self.events = []
 
     def _valid_formation(players):
         positions = list(map(lambda x: x['element_type'], players))
@@ -163,12 +164,14 @@ class User:
     def leagues(self):
         return self.user_team_info['leagues']['classic']
 
-    def add_events(self, live_info: List, prev_info: List):
+    def add_events(self, live_info: Dict, prev_info: Dict):
         events = []
-        for d1, d2 in zip(live_info, prev_info):
-            for key, value in d1.items():
-                if value != d2[key]:
-                    events.append((key, value['live_score'] - d2[key]['live_score']))
+        for item in live_info.keys():
+            prev_score = prev_info[item]['live_score']
+            new_score = live_info[item]['live_score']
+            if prev_score != new_score:
+                print('Event Added for {item}')
+                events.append((item, prev_score - new_score))
         self.events.extend(events)
         return events
 
@@ -178,6 +181,7 @@ class User:
         active_chip = picks['active_chip']
         picks = picks['picks']
         first_xi_live_detail = self.get_first_xi_live_detail()
+        # print(first_xi_live_detail)
         self.add_events(first_xi_live_detail, self.current_player_info)
         self.current_player_info = first_xi_live_detail
         subs_out = [player['id']
@@ -206,17 +210,17 @@ class User:
             first_xi_live_scores.append(player['live_score'])
 
         captain = next(pick["element"] for pick in picks if pick["is_captain"])
-        print(f'Captain: {captain}, '
-              f'{first_xi_live_detail[captain]["web_name"]}')
+        # print(f'Captain: {captain}, '
+        #       f'{first_xi_live_detail[captain]["web_name"]}')
         try:
             vice_captain = next(
                 pick["element"] for pick in picks
                 if pick["is_vice_captain"] and pick["multiplier"] == 1)
         except StopIteration:
             vice_captain = None
-        captain_points = self.first_xi_live_detail[captain]['live_score']
+        captain_points = first_xi_live_detail[captain]['live_score']
         if captain in subs_out and vice_captain:
-            captain_points = self.first_xi_live_detail[vice_captain]['live_score']
+            captain_points = first_xi_live_detail[vice_captain]['live_score']
 
         if active_chip == "3xc":
             captain_points *= 2
