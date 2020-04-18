@@ -181,7 +181,6 @@ class User:
         active_chip = picks['active_chip']
         picks = picks['picks']
         first_xi_live_detail = self.get_first_xi_live_detail()
-        # print(first_xi_live_detail)
         self.add_events(first_xi_live_detail, self.current_player_info)
         self.current_player_info = first_xi_live_detail
         subs_out = [player['id']
@@ -210,8 +209,8 @@ class User:
             first_xi_live_scores.append(player['live_score'])
 
         captain = next(pick["element"] for pick in picks if pick["is_captain"])
-        # print(f'Captain: {captain}, '
-        #       f'{first_xi_live_detail[captain]["web_name"]}')
+        print(f'Captain: {captain}, '
+              f'{first_xi_live_detail[captain]["web_name"]}')
         try:
             vice_captain = next(
                 pick["element"] for pick in picks
