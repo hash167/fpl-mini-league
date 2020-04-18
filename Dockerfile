@@ -14,4 +14,4 @@ ADD . /app
 RUN adduser --disabled-login --system --gecos 'App User' app
 USER app
 
-CMD gunicorn src.app:application --config src/config/gunicorn/$GUNICORN_CONFIG.py --log-file=-
+CMD gunicorn src:application --config src/config/gunicorn/$GUNICORN_CONFIG.py --log-file=-
